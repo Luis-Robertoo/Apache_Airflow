@@ -3,3 +3,5 @@
 airflow/airflow.db
 
 airflow/logs
+
+airflow/plugins/operators/*.json
