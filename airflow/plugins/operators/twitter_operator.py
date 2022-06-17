@@ -1,11 +1,10 @@
 
-
-from xml.sax import _create_parser
 from airflow.models import BaseOperator, DAG, TaskInstance
 from airflow.utils.decorators import apply_defaults
 from hooks.twitter_hook import TwitterHook
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+from os.path import join
 import json
 
 
@@ -59,9 +58,14 @@ class TwitterOperator(BaseOperator):
 if __name__ == "__main__":
     with DAG(dag_id="TwitterTest", start_date=datetime.now()) as dag:
         to = TwitterOperator(query="AluraOnline", 
-        file_path="AluraOnline_{{ ds_nodash }}.json",
+        file_path=join(
+            "/home/luis/projetos/dados/datapipeline/datalake",
+            "twitter_aluraonline",
+            "extract_date={{ ds }}",
+            "AluraOnline_{{ ds_nodash }}.json"
+        ),
         task_id="test_run")
 
-        ti = TaskInstance(task=to, execution_date=datetime.now())
+        ti = TaskInstance(task=to, execution_date=datetime.now() - timedelta(days=3))
 
         ti.run()
