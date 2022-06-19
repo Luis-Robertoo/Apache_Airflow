@@ -1,6 +1,8 @@
 from datetime import datetime
 from os.path import join
+from pathlib import Path
 from airflow.models import DAG
+from numpy import partition
 from airflow.operators.alura import TwitterOperator
 from airflow.contrib.operators.spark_submit_operator import SparkSubmitOperator
 from airflow.utils.dates import days_ago
@@ -10,6 +12,14 @@ ARGS = {
     "depend_on_past": False,
     "start_date": days_ago(6)
 }
+
+BASE_FOLDER = join(
+    
+    #str(Path("~/home").expanduser()),
+    "/home/luis/projetos/dados/datapipeline/datalake/{stage}/twitter_aluraonline/{partition}"
+)
+
+PARTITION_FOLDER = "extract_date={{ ds }}"
 
 TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S.00Z"
 
@@ -24,32 +34,33 @@ with DAG(
         task_id="twitter_aluraonline",
         query="AluraOnline",
         file_path=join(
-            "/home/luis/projetos/dados/datapipeline/datalake",
-            "twitter_aluraonline",
-            "extract_date={{ ds }}",
+            BASE_FOLDER.format(stage="bronze", partition=PARTITION_FOLDER),
             "AluraOnline_{{ ds_nodash }}.json"
         ),
         start_time=(
             "{{"
-            f"execute_date.strftime('{ TIMESTAMP_FORMAT }')"
+            f"execution_date.strftime('{ TIMESTAMP_FORMAT }')"
             "}}"
         ),
         end_time=(
             "{{"
-            f"next_execute_date.strftime('{ TIMESTAMP_FORMAT }')"
+            f"next_execution_date.strftime('{ TIMESTAMP_FORMAT }')"
             "}}"
         )
     )
 
     twitter_transform = SparkSubmitOperator(
         task_id="transform_twitter_aluraonline",
-        application="/home/luis/projetos/dados/datapipeline/spark/transformation.py",
+        application=join(
+            str(Path(__file__).parents[2]),
+            "spark/transformation.py"
+        ),
         name="twitter_transformation",
         application_args=[
             "--src",
-            "/home/luis/projetos/dados/datapipeline/datalake/bronze/twitter_aluraonline/extract_date=2022-06-18",
+            BASE_FOLDER.format(stage="bronze", partition=PARTITION_FOLDER),
             "--dest",
-            "/home/luis/projetos/dados/datapipeline/datalake/silver/twitter_aluraOnline",
+            BASE_FOLDER.format(stage="silver", partition=""),
             "--process-date",
             "{{ ds }}"
         ]
