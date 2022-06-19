@@ -3,9 +3,23 @@ from os.path import join
 from airflow.models import DAG
 from airflow.operators.alura import TwitterOperator
 from airflow.contrib.operators.spark_submit_operator import SparkSubmitOperator
+from airflow.utils.dates import days_ago
 
+ARGS = {
+    "owner": "airflow",
+    "depend_on_past": False,
+    "start_date": days_ago(6)
+}
 
-with DAG(dag_id="twitter_dag", start_date=datetime.now()) as dag:
+TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S.00Z"
+
+with DAG(
+    dag_id="twitter_dag",
+    default_args=ARGS,
+    schedule_interval="0 9 * * *",
+    max_active_runs=1
+) as dag:
+
     twitter_operator = TwitterOperator(
         task_id="twitter_aluraonline",
         query="AluraOnline",
@@ -14,6 +28,16 @@ with DAG(dag_id="twitter_dag", start_date=datetime.now()) as dag:
             "twitter_aluraonline",
             "extract_date={{ ds }}",
             "AluraOnline_{{ ds_nodash }}.json"
+        ),
+        start_time=(
+            "{{"
+            f"execute_date.strftime('{ TIMESTAMP_FORMAT }')"
+            "}}"
+        ),
+        end_time=(
+            "{{"
+            f"next_execute_date.strftime('{ TIMESTAMP_FORMAT }')"
+            "}}"
         )
     )
 
@@ -30,3 +54,5 @@ with DAG(dag_id="twitter_dag", start_date=datetime.now()) as dag:
             "{{ ds }}"
         ]
     )
+
+    twitter_operator >> twitter_transform
